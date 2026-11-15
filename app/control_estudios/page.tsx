@@ -360,7 +360,8 @@ const GestionInstitutoPage: React.FC = () => {
       descripcion: 'Se cerrará tu sesión actual',
       onConfirm: async () => {
         setConfirmacion(null);
-        await signOut({ callbackUrl: '/' });
+        await signOut({ redirect: false });
+        router.push('/');
       },
     });
   };
