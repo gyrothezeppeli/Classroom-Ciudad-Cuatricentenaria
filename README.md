@@ -66,5 +66,7 @@ messages through Gmail, configure these server-side environment variables in
 
 Enable 2-Step Verification on the Gmail account and create an App Password in
 its Google Account security settings. Never commit the App Password or expose it
-with a `NEXT_PUBLIC_` variable. Existing accounts are kept verified by the
-database migration; new registrations require email verification.
+with a `NEXT_PUBLIC_` variable. Apply database migrations to the production
+database with `npx prisma migrate deploy`. This migration marks accounts that
+already exist as verified; accounts registered afterward require email
+verification.

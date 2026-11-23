@@ -86,40 +86,42 @@ function VerifyEmailContent() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-white">
-      <section className="w-full max-w-lg rounded-2xl border border-white/10 bg-white/5 p-8 text-center shadow-2xl">
-        <h1 className="mb-4 text-2xl font-bold">Verificación de correo</h1>
-        <p className="mb-6 text-slate-300">{messages[state]}</p>
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
+      <section className="liquid-login-card w-full max-w-lg rounded-[40px] p-8 text-center sm:p-10">
+        <div className="liquid-login-content">
+          <h1 className="mb-4 text-2xl font-bold">Verificación de correo</h1>
+          <p className="mb-6 text-muted-foreground">{messages[state]}</p>
 
-        {state !== 'verified' && state !== 'checking' && (
-          <form onSubmit={handleResend} className="mb-6 space-y-3 text-left">
-            <label htmlFor="verification-email" className="block text-sm text-slate-200">
-              Correo electrónico
-            </label>
-            <input
-              id="verification-email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="w-full rounded-lg border border-white/15 bg-black/30 px-4 py-3 text-white outline-none focus:border-sky-400"
-            />
-            <button
-              type="submit"
-              disabled={resending}
-              className="w-full rounded-lg bg-sky-600 px-4 py-3 font-semibold transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {resending ? 'Enviando...' : 'Reenviar verificación'}
-            </button>
-            {resendMessage && <p className="text-sm text-emerald-300">{resendMessage}</p>}
-            {resendError && <p role="alert" className="text-sm text-red-300">{resendError}</p>}
-          </form>
-        )}
+          {state !== 'verified' && state !== 'checking' && (
+            <form onSubmit={handleResend} className="mb-6 space-y-3 text-left">
+              <label htmlFor="verification-email" className="block text-sm text-foreground">
+                Correo electrónico
+              </label>
+              <input
+                id="verification-email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="w-full rounded-lg border border-border bg-white/5 px-4 py-3 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
+              />
+              <button
+                type="submit"
+                disabled={resending}
+                className="w-full rounded-lg bg-primary px-4 py-3 font-semibold text-primary-foreground transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {resending ? 'Enviando...' : 'Reenviar verificación'}
+              </button>
+              {resendMessage && <p className="text-sm text-emerald-300">{resendMessage}</p>}
+              {resendError && <p role="alert" className="text-sm text-red-300">{resendError}</p>}
+            </form>
+          )}
 
-        <Link href="/" className="text-sm font-semibold text-sky-300 hover:text-sky-200">
-          Volver al inicio de sesión
-        </Link>
+          <Link href="/" className="text-sm font-semibold text-primary hover:brightness-125">
+            Volver al inicio de sesión
+          </Link>
+        </div>
       </section>
     </main>
   );
@@ -127,8 +129,8 @@ function VerifyEmailContent() {
 
 function VerificationMessage({ message }: { message: string }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-white">
-      <p className="text-slate-300">{message}</p>
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
+      <p className="text-muted-foreground">{message}</p>
     </main>
   );
 }
