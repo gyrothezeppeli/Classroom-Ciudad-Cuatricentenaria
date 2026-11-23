@@ -4,7 +4,6 @@ import { prisma } from '@/lib/prisma';
 
 import bcrypt from 'bcryptjs';
 
-import { StudentAssignmentService } from '@/lib/asignar';
 
 import {
   normalizarGrado,
@@ -18,17 +17,24 @@ export class EstudiantesService {
   constructor(private readonly prismaClient: typeof prisma = prisma) {}
 
 
-  async GET() {
+  async GET(req?: NextRequest) {
   try {
+    const soloPendientes = req?.nextUrl.searchParams.get('pendientes') === 'true';
     const estudiantes = await this.prismaClient.estudiante.findMany({
+      where: soloPendientes ? { user: { aprobado: false } } : undefined,
       include: {
         user: {
           select: {
             nombre: true,
             apellido: true,
             email: true,
-            telefono: true
+            telefono: true,
+            aprobado: true,
+            createdAt: true
           }
+        },
+        salon: {
+          select: { anioAcademico: true }
         }
       },
       orderBy: { createdAt: 'desc' }
@@ -45,6 +51,12 @@ export class EstudiantesService {
       nivel: est.nivel || '',
       grado: est.grado || '',
       seccion: est.seccion || '',
+      aprobado: est.user?.aprobado ?? true,
+      anioAcademico: est.salon?.anioAcademico || (() => {
+        const fecha = est.user?.createdAt ? new Date(est.user.createdAt) : new Date();
+        const anio = fecha.getFullYear();
+        return fecha.getMonth() >= 7 ? `${anio}-${anio + 1}` : `${anio - 1}-${anio}`;
+      })(),
       fechaNacimiento: ''
     }));
 
@@ -195,7 +207,8 @@ export class EstudiantesService {
           nombre: data.nombre,
           apellido: data.apellido || null,
           telefono: data.numeroTelefonoCelular || null,
-          role: "ESTUDIANTE"
+          role: "ESTUDIANTE",
+          aprobado: false
         }
       });
 
@@ -225,13 +238,7 @@ export class EstudiantesService {
 
     console.log(`✅ Estudiante creado: ${estudiante.user.nombre} ${estudiante.user.apellido} | ${estudiante.nivel} ${estudiante.grado} ${estudiante.seccion}`);
 
-    const asignaciones = await new StudentAssignmentService(this.prismaClient)
-      .assignExistingContent(estudiante);
-    console.log(
-      `🎉 Total asignado a ${estudiante.user.nombre}: ${asignaciones.planes} planes, ` +
-      `${asignaciones.tareas} tareas, ${asignaciones.avisos} avisos, ` +
-      `${asignaciones.materiales} materiales`
-    );
+    const asignaciones = { planes: 0, tareas: 0, avisos: 0, materiales: 0 };
 
     // ============================================
     // 13. Respuesta exitosa

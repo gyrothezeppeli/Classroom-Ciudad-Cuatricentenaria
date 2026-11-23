@@ -14,6 +14,8 @@ export async function verifyTurnstileToken(
   token: string,
   expectedAction: "login" | "register",
 ): Promise<boolean> {
+  if (process.env.NODE_ENV === "development") return true;
+
   const secret = process.env.TURNSTILE_SECRET_KEY;
   if (!secret) throw new TurnstileConfigurationError();
   if (!token || token.length > 2048) return false;

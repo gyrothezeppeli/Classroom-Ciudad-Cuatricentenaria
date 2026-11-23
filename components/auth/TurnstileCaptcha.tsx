@@ -73,6 +73,11 @@ export function TurnstileCaptcha({
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
   useEffect(() => {
+    if (process.env.NODE_ENV === "development") {
+      onVerify("local-development-bypass");
+      return;
+    }
+
     if (!siteKey || !containerRef.current) return;
 
     let isMounted = true;
@@ -107,7 +112,7 @@ export function TurnstileCaptcha({
 
   return (
     <div className="flex flex-col items-center gap-2">
-      {siteKey ? (
+      {process.env.NODE_ENV === "development" ? null : siteKey ? (
         <div ref={containerRef} />
       ) : (
         <p className="text-center text-sm text-red-200">

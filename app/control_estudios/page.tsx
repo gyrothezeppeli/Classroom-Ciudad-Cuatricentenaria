@@ -69,6 +69,8 @@ interface Estudiante {
   seccion: string;
   numeroTelefonoCelular: string;
   correoElectronico: string;
+  aprobado?: boolean;
+  anioAcademico?: string;
   userId?: string;
 }
 
@@ -102,7 +104,7 @@ interface Nota {
   docente?: string | null;
 }
 
-type TabType = 'estudiantes' | 'docentes' | 'notas' | 'notasDocentes' | 'actualizar';
+type TabType = 'estudiantes' | 'docentes' | 'solicitudes' | 'notas' | 'notasDocentes' | 'actualizar';
 
 interface FilaPrevisualizacion {
   cedula: string;
@@ -161,6 +163,10 @@ const GestionInstitutoPage: React.FC = () => {
   } | null>(null);
 
   const [estudiantes, setEstudiantes] = useState<Estudiante[]>([]);
+  const [solicitudesPendientes, setSolicitudesPendientes] = useState<Estudiante[]>([]);
+  const [solicitudesSeleccionadas, setSolicitudesSeleccionadas] = useState<string[]>([]);
+  const [filtroAnioPendiente, setFiltroAnioPendiente] = useState<string>('');
+  const [procesandoSolicitudes, setProcesandoSolicitudes] = useState(false);
   const [docentes, setDocentes] = useState<Docente[]>([]);
 
   const [notas, setNotas] = useState<Nota[]>([]);
@@ -190,7 +196,12 @@ const GestionInstitutoPage: React.FC = () => {
       const resEstudiantes = await fetch('/api/estudiantes');
       if (resEstudiantes.ok) {
         const data = await resEstudiantes.json();
-        setEstudiantes(data);
+        setEstudiantes(data.filter((estudiante: Estudiante) => estudiante.aprobado !== false));
+      }
+
+      const resPendientes = await fetch('/api/estudiantes?pendientes=true');
+      if (resPendientes.ok) {
+        setSolicitudesPendientes(await resPendientes.json());
       }
 
       const resDocentes = await fetch('/api/docentes');
@@ -1052,6 +1063,53 @@ const GestionInstitutoPage: React.FC = () => {
     return filtered;
   }, [docentes, searchTerm, filtroNivel, filtroSeccion]);
 
+  const solicitudesFiltradas = useMemo(() => {
+    let filtradas = solicitudesPendientes;
+    if (filtroNivel) filtradas = filtradas.filter((estudiante) => estudiante.nivel === filtroNivel);
+    if (filtroGrado) filtradas = filtradas.filter((estudiante) => estudiante.grado === filtroGrado);
+    if (filtroSeccion) filtradas = filtradas.filter((estudiante) => estudiante.seccion === filtroSeccion);
+    if (filtroAnioPendiente) filtradas = filtradas.filter((estudiante) => estudiante.anioAcademico === filtroAnioPendiente);
+    if (searchTerm) {
+      const termino = searchTerm.toLowerCase().trim();
+      filtradas = filtradas.filter((estudiante) =>
+        `${estudiante.nombres} ${estudiante.apellidos}`.toLowerCase().includes(termino) ||
+        estudiante.cedulaIdentidad.toLowerCase().includes(termino)
+      );
+    }
+    return filtradas;
+  }, [solicitudesPendientes, filtroNivel, filtroGrado, filtroSeccion, filtroAnioPendiente, searchTerm]);
+
+  const procesarSolicitudes = async (accion: 'aprobar' | 'rechazar') => {
+    if (solicitudesSeleccionadas.length === 0) {
+      sileo.warning({ title: 'Sin selección', description: 'Seleccione al menos una solicitud' });
+      return;
+    }
+
+    setProcesandoSolicitudes(true);
+    try {
+      const response = await fetch('/api/estudiantes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: solicitudesSeleccionadas, accion }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'No se pudieron procesar las solicitudes');
+      }
+      setSolicitudesPendientes((actuales) => actuales.filter((estudiante) => !solicitudesSeleccionadas.includes(estudiante.id)));
+      if (accion === 'aprobar') await cargarDatos();
+      setSolicitudesSeleccionadas([]);
+      sileo.success({
+        title: accion === 'aprobar' ? 'Solicitudes aprobadas' : 'Solicitudes rechazadas',
+        description: `${solicitudesSeleccionadas.length} solicitud(es) procesada(s)`,
+      });
+    } catch (error) {
+      sileo.error({ title: 'Error', description: error instanceof Error ? error.message : 'No se pudo completar la operación' });
+    } finally {
+      setProcesandoSolicitudes(false);
+    }
+  };
+
   const limpiarFiltros = () => {
     setSearchTerm('');
     setFiltroNivel('');
@@ -1060,6 +1118,8 @@ const GestionInstitutoPage: React.FC = () => {
     setLimiteEstudiantes(20);
     setFiltroMateria('');
     setFiltroDocente('');
+    setFiltroAnioPendiente('');
+    setSolicitudesSeleccionadas([]);
     // Limpiamos también los estados de actualización al cambiar de pestaña
     setSeleccionados([]);
     setNuevoNivel('');
@@ -1067,7 +1127,7 @@ const GestionInstitutoPage: React.FC = () => {
     setNuevaSeccion('');
   };
 
-  const tieneFiltrosActivos = searchTerm || filtroNivel || filtroGrado || filtroSeccion || filtroMateria;
+  const tieneFiltrosActivos = searchTerm || filtroNivel || filtroGrado || filtroSeccion || filtroAnioPendiente || filtroMateria;
 
   // ============ FUNCIÓN MEJORADA DE ACTUALIZACIÓN MASIVA ============
   const handleEdicionMasiva = async () => {
@@ -1160,6 +1220,7 @@ const GestionInstitutoPage: React.FC = () => {
 
   const tabs = [
     { key: 'estudiantes' as const, label: 'Estudiantes', icon: <Users className="w-4 h-4" /> },
+    { key: 'solicitudes' as const, label: 'Solicitudes pendientes', icon: <AlertCircle className="w-4 h-4" /> },
     { key: 'docentes' as const, label: 'Docentes', icon: <GraduationCap className="w-4 h-4" /> },
     { key: 'notas' as const, label: 'Nóminas', icon: <ClipboardList className="w-4 h-4" /> },
     { key: 'notasDocentes' as const, label: 'Ver Notas de Docentes', icon: <GraduationCap className="w-4 h-4" /> },
@@ -1185,6 +1246,7 @@ const GestionInstitutoPage: React.FC = () => {
         <div className="flex items-center gap-2 sm:gap-3">
           <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 px-3 py-1.5 text-xs font-semibold">
             {tabActiva === 'estudiantes' && `${estudiantes.length} estudiantes`}
+            {tabActiva === 'solicitudes' && `${solicitudesPendientes.length} pendientes`}
             {tabActiva === 'docentes' && `${docentes.length} docentes`}
             {tabActiva === 'notas' && `${notas.length} notas`}
             {tabActiva === 'notasDocentes' && `${notasDocentes.length} notas`}
@@ -1246,6 +1308,7 @@ const GestionInstitutoPage: React.FC = () => {
               <div className="space-y-2">
                 <CardTitle className="text-2xl sm:text-3xl font-black text-white m-0">
                   {tabActiva === 'estudiantes' && 'Gestión de Estudiantes'}
+                  {tabActiva === 'solicitudes' && 'Solicitudes Pendientes'}
                   {tabActiva === 'docentes' && 'Gestión de Docentes'}
                   {tabActiva === 'notas' && 'Nóminas'}
                   {tabActiva === 'notasDocentes' && 'Notas Subidas por Docentes'}
@@ -1253,6 +1316,7 @@ const GestionInstitutoPage: React.FC = () => {
                 </CardTitle>
                 <p className="text-gray-400 text-sm sm:text-base m-0">
                   {tabActiva === 'estudiantes' && `Total: ${estudiantes.length} estudiantes registrados`}
+                  {tabActiva === 'solicitudes' && `Estudiantes esperando confirmación: ${solicitudesPendientes.length}`}
                   {tabActiva === 'docentes' && `Total: ${docentes.length} docentes registrados`}
                   {tabActiva === 'notas' && 'Visualiza y exporta nóminas de calificaciones'}
                   {tabActiva === 'notasDocentes' && 'Revisa las calificaciones subidas por los docentes'}
@@ -1298,7 +1362,7 @@ const GestionInstitutoPage: React.FC = () => {
                       <Input
                         type="text"
                         placeholder={
-                          tabActiva === 'estudiantes' ? 'Buscar por nombre, apellido o cedula...' :
+                          tabActiva === 'estudiantes' || tabActiva === 'solicitudes' ? 'Buscar por nombre, apellido o cedula...' :
                             tabActiva === 'docentes' ? 'Buscar por nombre, apellido, cedula o email...' :
                               'Buscar estudiantes por nombre, apellido o cedula...'
                         }
@@ -1326,7 +1390,7 @@ const GestionInstitutoPage: React.FC = () => {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                       <Select
                         value={filtroNivel || 'all'}
                         onValueChange={(v) => {
@@ -1346,7 +1410,7 @@ const GestionInstitutoPage: React.FC = () => {
                         </SelectContent>
                       </Select>
 
-                      {(tabActiva === 'estudiantes' || tabActiva === 'actualizar') && (
+                      {(tabActiva === 'estudiantes' || tabActiva === 'solicitudes' || tabActiva === 'actualizar') && (
                         <Select
                           value={filtroGrado || 'all'}
                           onValueChange={(v) => {
@@ -1384,6 +1448,23 @@ const GestionInstitutoPage: React.FC = () => {
                           ))}
                         </SelectContent>
                       </Select>
+
+                      {tabActiva === 'solicitudes' && (
+                        <Select
+                          value={filtroAnioPendiente || 'all'}
+                          onValueChange={(v) => setFiltroAnioPendiente(v === 'all' || !v ? '' : v)}
+                        >
+                          <SelectTrigger className="bg-black/30 border-white/10 text-white h-11">
+                            <SelectValue placeholder="Todos los años" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Todos los años</SelectItem>
+                            {Array.from(new Set(solicitudesPendientes.map((estudiante) => estudiante.anioAcademico).filter(Boolean))).sort().map((anio) => (
+                              <SelectItem key={anio} value={anio as string}>Año {anio}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
 
                       {tieneFiltrosActivos && (
                         <Button
@@ -2345,6 +2426,96 @@ const GestionInstitutoPage: React.FC = () => {
                       )}
                     </TableBody>
                   </Table>
+                </div>
+              )}
+
+              {tabActiva === 'solicitudes' && (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                    <p className="text-sm text-gray-300">
+                      <span className="font-bold text-amber-400">{solicitudesSeleccionadas.length}</span> solicitudes seleccionadas
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setSolicitudesSeleccionadas(solicitudesFiltradas.map((estudiante) => estudiante.id))}
+                        className="border-white/10 text-gray-300"
+                      >
+                        Seleccionar visibles
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setSolicitudesSeleccionadas([])}
+                        className="border-white/10 text-gray-300"
+                      >
+                        Limpiar
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => procesarSolicitudes('rechazar')}
+                        disabled={procesandoSolicitudes || solicitudesSeleccionadas.length === 0}
+                        className="bg-red-500/15 text-red-300 border border-red-500/30 hover:bg-red-500/25"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" /> Rechazar
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => procesarSolicitudes('aprobar')}
+                        disabled={procesandoSolicitudes || solicitudesSeleccionadas.length === 0}
+                        className="bg-emerald-500 text-emerald-950 hover:bg-emerald-400"
+                      >
+                        <CheckCircle2 className="mr-2 h-4 w-4" /> Aprobar
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border border-white/10 bg-black/30">
+                    <Table className="w-max min-w-full">
+                      <TableHeader>
+                        <TableRow className="border-b border-white/15 bg-black/40 hover:bg-black/40">
+                          <TableHead className="w-12">
+                            <Checkbox
+                              aria-label="Seleccionar todas las solicitudes visibles"
+                              checked={solicitudesFiltradas.length > 0 && solicitudesFiltradas.every((estudiante) => solicitudesSeleccionadas.includes(estudiante.id))}
+                              onCheckedChange={(checked) => setSolicitudesSeleccionadas(checked ? solicitudesFiltradas.map((estudiante) => estudiante.id) : [])}
+                            />
+                          </TableHead>
+                          {['Cédula', 'Estudiante', 'Nivel', 'Grado', 'Sección', 'Año', 'Correo', 'Teléfono'].map((titulo) => (
+                            <TableHead key={titulo} className="text-emerald-400 text-xs font-bold uppercase">{titulo}</TableHead>
+                          ))}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {solicitudesFiltradas.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={9} className="py-12 text-center text-gray-400">No hay solicitudes pendientes</TableCell>
+                          </TableRow>
+                        ) : solicitudesFiltradas.map((estudiante) => (
+                          <TableRow key={estudiante.id} className="border-b border-white/15 bg-black/10 hover:bg-white/5">
+                            <TableCell>
+                              <Checkbox
+                                aria-label={`Seleccionar a ${estudiante.nombres} ${estudiante.apellidos}`}
+                                checked={solicitudesSeleccionadas.includes(estudiante.id)}
+                                onCheckedChange={(checked) => setSolicitudesSeleccionadas((actuales) => checked
+                                  ? [...actuales, estudiante.id]
+                                  : actuales.filter((id) => id !== estudiante.id))}
+                              />
+                            </TableCell>
+                            <TableCell className="font-mono font-semibold text-emerald-400">{estudiante.cedulaIdentidad}</TableCell>
+                            <TableCell className="font-medium text-white">{estudiante.nombres} {estudiante.apellidos}</TableCell>
+                            <TableCell className="text-white">{niveles.find((nivel) => nivel.id === estudiante.nivel)?.nombre || estudiante.nivel}</TableCell>
+                            <TableCell className="text-white">{estudiante.grado}</TableCell>
+                            <TableCell><Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400">{estudiante.seccion}</Badge></TableCell>
+                            <TableCell className="text-white">{estudiante.anioAcademico || '-'}</TableCell>
+                            <TableCell className="text-gray-400">{estudiante.correoElectronico}</TableCell>
+                            <TableCell className="text-white">{estudiante.numeroTelefonoCelular || '-'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               )}
 

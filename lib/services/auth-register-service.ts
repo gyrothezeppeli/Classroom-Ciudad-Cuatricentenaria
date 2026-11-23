@@ -145,6 +145,7 @@ export class AuthRegisterService {
           apellido: payload.apellido || null,
           telefono: payload.telefono || null,
           role: rolFinal,
+          aprobado: rolFinal === Role.ESTUDIANTE ? false : true,
         },
       });
 
@@ -172,8 +173,8 @@ export class AuthRegisterService {
       return { user, estudiante };
     });
 
-    if (result.estudiante) {
-      await this.contentAssignmentService.assignExistingContent(result.estudiante);
+    if (result.estudiante && rolFinal === Role.ESTUDIANTE) {
+      // Los contenidos se asignan al aprobar la solicitud, no al crearla.
     }
 
     return {
