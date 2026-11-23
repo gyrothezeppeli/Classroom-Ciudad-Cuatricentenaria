@@ -2,7 +2,8 @@ import { Role, type PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 import { prisma } from '@/lib/prisma';
-import { StudentAssignmentService } from '@/lib/asignar';
+import { sendVerificationEmail } from '@/lib/email/gmail';
+import { createEmailVerificationToken } from '@/lib/services/email-verification-service';
 
 interface RegistrationPayload {
   email: string;
@@ -81,7 +82,7 @@ function parsePayload(value: unknown): RegistrationPayload | null {
   }
 
   return {
-    email,
+    email: email.trim().toLowerCase(),
     password,
     nombre,
     apellido: readOptionalString(value, 'apellido'),
@@ -96,11 +97,7 @@ function parsePayload(value: unknown): RegistrationPayload | null {
 }
 
 export class AuthRegisterService {
-  constructor(
-    private readonly prismaClient: PrismaClient = prisma,
-    private readonly contentAssignmentService: StudentAssignmentService =
-      new StudentAssignmentService(prismaClient),
-  ) {}
+  constructor(private readonly prismaClient: PrismaClient = prisma) {}
 
   async register(input: unknown): Promise<RegistrationResult> {
     const payload = parsePayload(input);
@@ -136,6 +133,7 @@ export class AuthRegisterService {
     }
 
     const hashedPassword = await bcrypt.hash(payload.password, 10);
+    const verificationToken = createEmailVerificationToken();
     const result = await this.prismaClient.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -146,6 +144,14 @@ export class AuthRegisterService {
           telefono: payload.telefono || null,
           role: rolFinal,
           aprobado: rolFinal === Role.ESTUDIANTE ? false : true,
+        },
+      });
+
+      await tx.emailVerificationToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: verificationToken.tokenHash,
+          expiresAt: verificationToken.expiresAt,
         },
       });
 
@@ -170,16 +176,19 @@ export class AuthRegisterService {
         });
       }
 
-      return { user, estudiante };
+      return { user, estudiante, verificationToken: verificationToken.token };
     });
 
-    if (result.estudiante && rolFinal === Role.ESTUDIANTE) {
-      // Los contenidos se asignan al aprobar la solicitud, no al crearla.
+    try {
+      await sendVerificationEmail(result.user.email, result.verificationToken);
+    } catch (error) {
+      await this.prismaClient.user.delete({ where: { id: result.user.id } });
+      throw error;
     }
 
     return {
       success: true,
-      message: 'Usuario registrado exitosamente',
+      message: 'Cuenta creada. Verifica tu correo para poder iniciar sesión.',
       user: {
         id: result.user.id,
         email: result.user.email,

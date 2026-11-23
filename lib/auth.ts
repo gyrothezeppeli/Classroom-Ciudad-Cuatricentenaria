@@ -64,6 +64,11 @@ export const authOptions: NextAuthOptions = {
             return null
           }
 
+          if (!user.emailVerified) {
+            console.log("❌ Correo no verificado")
+            return null
+          }
+
           console.log("✅ Login exitoso:", user.email, "Rol:", user.role)
 
           return {

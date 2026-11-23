@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { GmailConfigurationError, GmailDeliveryError } from '@/lib/email/gmail';
 import { authRegisterService } from '@/lib/services/auth-register-service'
 import {
   TurnstileConfigurationError,
@@ -47,6 +48,18 @@ export async function POST(req: Request) {
     if (error instanceof TurnstileConfigurationError) {
       return NextResponse.json(
         { error: 'La verificación de seguridad no está configurada' },
+        { status: 503 },
+      );
+    }
+    if (error instanceof GmailConfigurationError) {
+      return NextResponse.json(
+        { error: 'El envío de correo no está configurado. Contacta al administrador.' },
+        { status: 503 },
+      );
+    }
+    if (error instanceof GmailDeliveryError) {
+      return NextResponse.json(
+        { error: 'No se pudo enviar el correo de verificación. Intenta registrarte nuevamente.' },
         { status: 503 },
       );
     }

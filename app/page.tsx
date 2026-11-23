@@ -187,15 +187,7 @@ const AuthPage: React.FC = () => {
           return;
         }
 
-        sileo.success({
-          title: '¡Cuenta creada!',
-          description: `Bienvenido ${formData.nombre}`,
-        });
-
-        setIsLogin(true);
-        setFormData(AuthForm.createEmptyData());
-        setErrores({});
-        setLoading(false);
+        router.push(`/verificar-correo?email=${encodeURIComponent(userData.email)}`);
         return;
       }
 

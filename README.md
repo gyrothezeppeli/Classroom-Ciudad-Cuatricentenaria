@@ -50,3 +50,21 @@ Set both variables for every Vercel environment where the app should work
 (Production, Preview, and Development as applicable). For local development,
 put the same variables in `.env.local`. The secret key must never use the
 `NEXT_PUBLIC_` prefix.
+
+## Email verification
+
+New accounts must verify their email before signing in. To send verification
+messages through Gmail, configure these server-side environment variables in
+`.env.local` for local development and in the deployment environment:
+
+| Variable | Value |
+| --- | --- |
+| `GMAIL_USER` | Gmail address used to send messages |
+| `GMAIL_APP_PASSWORD` | Google App Password for that account (not the Gmail login password) |
+| `GMAIL_FROM` | Optional sender name/address; defaults to `Classroom <GMAIL_USER>` |
+| `NEXTAUTH_URL` | Public base URL of the application |
+
+Enable 2-Step Verification on the Gmail account and create an App Password in
+its Google Account security settings. Never commit the App Password or expose it
+with a `NEXT_PUBLIC_` variable. Existing accounts are kept verified by the
+database migration; new registrations require email verification.

@@ -130,10 +130,8 @@ const AuthPage: React.FC = () => {
           return;
         }
 
-        const registration = await authService.register(
-          form.toRegistrationPayload(),
-          captchaToken,
-        );
+        const registrationPayload = form.toRegistrationPayload();
+        const registration = await authService.register(registrationPayload, captchaToken);
 
         if (registration.error) {
           sileo.error({
@@ -144,15 +142,7 @@ const AuthPage: React.FC = () => {
           return;
         }
 
-        sileo.success({
-          title: '¡Cuenta creada!',
-          description: `Bienvenido ${formData.nombre}`,
-        });
-
-        setIsLogin(true);
-        setFormData(AuthForm.createEmptyData());
-        setErrores({});
-        setLoading(false);
+        router.push(`/verificar-correo?email=${encodeURIComponent(registrationPayload.email)}`);
         return;
       }
 
