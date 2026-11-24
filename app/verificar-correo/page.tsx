@@ -23,6 +23,8 @@ function VerifyEmailContent() {
   const [resending, setResending] = useState(false);
   const [resendMessage, setResendMessage] = useState('');
   const [resendError, setResendError] = useState('');
+  const [verifiedRole, setVerifiedRole] = useState<string>('');
+  const [verifiedAprobado, setVerifiedAprobado] = useState<boolean | undefined>();
   const verificationStarted = useRef(false);
 
   useEffect(() => {
@@ -37,7 +39,14 @@ function VerifyEmailContent() {
           body: JSON.stringify({ token }),
         });
 
-        setState(response.ok ? 'verified' : 'invalid');
+        if (response.ok) {
+          const result = await response.json() as { role?: string; aprobado?: boolean };
+          setVerifiedRole(result.role || '');
+          setVerifiedAprobado(result.aprobado);
+          setState('verified');
+        } else {
+          setState('invalid');
+        }
       } catch (error) {
         console.error('Error verificando correo desde la página:', error);
         setState('error');
@@ -80,7 +89,9 @@ function VerifyEmailContent() {
   const messages: Record<VerificationState, string> = {
     checking: 'Estamos validando tu enlace...',
     sent: 'Te enviamos un enlace de verificación. Revisa tu bandeja de entrada y spam.',
-    verified: 'Tu correo quedó verificado. Ya puedes iniciar sesión.',
+    verified: verifiedRole === 'ESTUDIANTE' && verifiedAprobado === false
+      ? 'Tu correo quedó verificado. La solicitud quedó pendiente de aprobación por Control de Estudios.'
+      : 'Tu correo quedó verificado. Ya puedes iniciar sesión.',
     invalid: 'El enlace no es válido o venció. Puedes solicitar uno nuevo.',
     error: 'Ocurrió un problema al verificar el correo. Intenta nuevamente.',
   };

@@ -53,11 +53,6 @@ export const authOptions: NextAuthOptions = {
             return null
           }
 
-          if (user.role === Role.ESTUDIANTE && !user.aprobado) {
-            console.log("❌ Estudiante pendiente de aprobación")
-            return null
-          }
-
           const isValid = await bcrypt.compare(credentials.password, user.password)
           if (!isValid) {
             console.log("❌ Contraseña incorrecta")
@@ -66,6 +61,11 @@ export const authOptions: NextAuthOptions = {
 
           if (!user.emailVerified) {
             console.log("❌ Correo no verificado")
+            return null
+          }
+
+          if (user.role === Role.ESTUDIANTE && !user.aprobado) {
+            console.log("❌ Estudiante pendiente de aprobación")
             return null
           }
 

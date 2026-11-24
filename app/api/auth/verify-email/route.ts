@@ -13,14 +13,20 @@ export async function POST(request: Request) {
         ? payload.token
         : null;
 
-    if (!(await emailVerificationService.verify(token))) {
+    const result = await emailVerificationService.verify(token);
+
+    if (!result.success) {
       return NextResponse.json(
         { error: 'El enlace de verificación no es válido o ya venció.' },
         { status: 400 },
       );
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      role: result.role,
+      aprobado: result.aprobado,
+    });
   } catch (error) {
     console.error('Error verificando correo:', error);
     return NextResponse.json(

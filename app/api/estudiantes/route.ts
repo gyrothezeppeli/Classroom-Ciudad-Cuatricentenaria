@@ -25,13 +25,17 @@ export async function PATCH(req: NextRequest) {
       const resultado = await prisma.user.deleteMany({
         where: {
           estudiante: { id: { in: ids } },
+          emailVerified: { not: null },
         },
       });
       return NextResponse.json({ exitosos: resultado.count });
     }
 
     const estudiantes = await prisma.estudiante.findMany({
-      where: { id: { in: ids } },
+      where: {
+        id: { in: ids },
+        user: { aprobado: false, emailVerified: { not: null } },
+      },
       select: { id: true, nivel: true, grado: true, seccion: true, userId: true },
     });
 

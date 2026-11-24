@@ -24,8 +24,10 @@ function hashToken(token: string): string {
 export class EmailVerificationService {
   constructor(private readonly prismaClient: PrismaClient = prisma) {}
 
-  async verify(token: unknown): Promise<boolean> {
-    if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) return false;
+  async verify(token: unknown): Promise<{ success: boolean; role?: string; aprobado?: boolean }> {
+    if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) {
+      return { success: false };
+    }
 
     const tokenHash = hashToken(token);
     const now = new Date();
@@ -35,24 +37,35 @@ export class EmailVerificationService {
         where: { tokenHash },
       });
 
-      if (!savedToken) return false;
+      if (!savedToken) return { success: false };
 
       if (savedToken.expiresAt <= now) {
         await tx.emailVerificationToken.delete({ where: { id: savedToken.id } });
-        return false;
+        return { success: false };
       }
 
       const consumedToken = await tx.emailVerificationToken.deleteMany({
         where: { id: savedToken.id, expiresAt: { gt: now } },
       });
-      if (consumedToken.count !== 1) return false;
+      if (consumedToken.count !== 1) return { success: false };
 
       const verifiedUser = await tx.user.updateMany({
         where: { id: savedToken.userId, emailVerified: null },
         data: { emailVerified: now },
       });
 
-      return verifiedUser.count === 1;
+      if (verifiedUser.count !== 1) return { success: false };
+
+      const user = await tx.user.findUnique({
+        where: { id: savedToken.userId },
+        select: { role: true, aprobado: true },
+      });
+
+      return {
+        success: true,
+        role: user?.role,
+        aprobado: user?.aprobado,
+      };
     });
   }
 

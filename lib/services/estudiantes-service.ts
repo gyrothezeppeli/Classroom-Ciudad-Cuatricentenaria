@@ -21,7 +21,9 @@ export class EstudiantesService {
   try {
     const soloPendientes = req?.nextUrl.searchParams.get('pendientes') === 'true';
     const estudiantes = await this.prismaClient.estudiante.findMany({
-      where: soloPendientes ? { user: { aprobado: false } } : undefined,
+      where: soloPendientes
+        ? { user: { aprobado: false, emailVerified: { not: null } } }
+        : undefined,
       include: {
         user: {
           select: {
@@ -208,6 +210,7 @@ export class EstudiantesService {
           apellido: data.apellido || null,
           telefono: data.numeroTelefonoCelular || null,
           role: "ESTUDIANTE",
+          emailVerified: new Date(),
           aprobado: false
         }
       });
