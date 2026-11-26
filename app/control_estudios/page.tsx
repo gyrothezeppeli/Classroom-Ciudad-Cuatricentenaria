@@ -174,6 +174,7 @@ const GestionInstitutoPage: React.FC = () => {
   const [filtroMateria, setFiltroMateria] = useState<string>('');
   const [filtroPeriodo, setFiltroPeriodo] = useState<string>('1er Lapso');
   const [exportando, setExportando] = useState(false);
+  const [guardandoConsolidado, setGuardandoConsolidado] = useState(false);
 
   const [notasDocentes, setNotasDocentes] = useState<Nota[]>([]);
   const [cargandoNotasDocentes, setCargandoNotasDocentes] = useState(false);
@@ -909,6 +910,93 @@ const GestionInstitutoPage: React.FC = () => {
       .map((m) => notas[m])
       .filter((n): n is number => n !== null && n !== undefined && !isNaN(n));
     return Grade.average(validas);
+  };
+
+  const guardarConsolidado = async () => {
+    const archivosParaGuardar = archivosPrevisualizacion.filter(
+      (archivo) => !archivo.error && archivo.filas.some((fila) => fila.valido)
+    );
+
+    if (archivosParaGuardar.length === 0) {
+      return sileo.warning({
+        title: 'Sin datos',
+        description: 'No hay notas válidas para guardar',
+      });
+    }
+
+    const faltanDatos = archivosParaGuardar.some(
+      (archivo) =>
+        !archivo.materiaDetectada.trim() ||
+        !archivo.nivelDetectado.trim() ||
+        !archivo.gradoDetectado.trim() ||
+        !archivo.seccionDetectada.trim() ||
+        !archivo.periodoDetectado.trim()
+    );
+
+    if (faltanDatos) {
+      return sileo.warning({
+        title: 'Datos incompletos',
+        description: 'Completa materia, nivel, grado, sección y período en cada archivo válido',
+      });
+    }
+
+    const notasParaGuardar = archivosParaGuardar.flatMap((archivo) =>
+      archivo.filas
+        .filter((fila) => fila.valido && fila.estudianteId)
+        .map((fila) => ({
+          estudianteId: fila.estudianteId,
+          materia: archivo.materiaDetectada,
+          nivel: archivo.nivelDetectado,
+          grado: archivo.gradoDetectado,
+          seccion: archivo.seccionDetectada,
+          periodo: archivo.periodoDetectado,
+          nota: Grade.parse(fila.nota),
+          observacion: fila.observacion,
+        }))
+    );
+
+    if (notasParaGuardar.length === 0) {
+      return sileo.warning({
+        title: 'Sin datos',
+        description: 'No hay notas válidas para guardar',
+      });
+    }
+
+    setGuardandoConsolidado(true);
+    try {
+      const response = await fetch('/api/notas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notas: notasParaGuardar }),
+      });
+      const resultado: { success?: boolean; guardadas?: number; error?: string } =
+        await response.json();
+
+      if (!response.ok || !resultado.success) {
+        throw new Error(resultado.error || 'No se pudo guardar la nómina');
+      }
+
+      if (resultado.guardadas !== notasParaGuardar.length) {
+        sileo.warning({
+          title: 'Guardado parcial',
+          description: `Se guardaron ${resultado.guardadas ?? 0} de ${notasParaGuardar.length} notas`,
+        });
+        return;
+      }
+
+      sileo.success({
+        title: 'Nómina consolidada guardada',
+        description: `${resultado.guardadas} notas guardadas en la base de datos`,
+      });
+    } catch (error) {
+      console.error('Error al guardar nómina consolidada:', error);
+      sileo.error({
+        title: 'Error al guardar nómina',
+        description: error instanceof Error ? error.message : 'No se pudieron guardar las notas',
+      });
+    } finally {
+      setGuardandoConsolidado(false);
+    }
   };
 
   const exportarConsolidado = async () => {
@@ -2128,6 +2216,15 @@ const GestionInstitutoPage: React.FC = () => {
                               </div>
 
                               <div className="flex flex-wrap gap-2 justify-end pt-3 border-t border-white/5">
+                                <Button
+                                  variant="outline"
+                                  onClick={guardarConsolidado}
+                                  disabled={guardandoConsolidado}
+                                  className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                                >
+                                  <Save className="mr-2 h-4 w-4" />
+                                  {guardandoConsolidado ? 'Guardando...' : 'Guardar nómina'}
+                                </Button>
                                 <Button
                                   variant="outline"
                                   onClick={exportarConsolidado}

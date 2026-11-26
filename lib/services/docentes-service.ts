@@ -235,23 +235,34 @@ export class DocentesService {
         )
       }
 
-      const docente = await this.prismaClient.docente.create({
-        data: {
-          userId: user.id,
-          cedulaIdentidad: cedulaIdentidad || null,
-          especialidad: especialidad || "General",
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-              nombre: true,
-              apellido: true,
-              telefono: true
+      const docente = await this.prismaClient.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: user.id },
+          data: {
+            role: "DOCENTE",
+            aprobado: true,
+            emailVerified: user.emailVerified ?? new Date(),
+          },
+        })
+
+        return tx.docente.create({
+          data: {
+            userId: user.id,
+            cedulaIdentidad: cedulaIdentidad || null,
+            especialidad: especialidad || "General",
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                nombre: true,
+                apellido: true,
+                telefono: true
+              }
             }
           }
-        }
+        })
       })
 
       return NextResponse.json({
@@ -311,7 +322,9 @@ export class DocentesService {
           nombre,
           apellido: apellido || null,
           telefono: telefono || null,
-          role: "DOCENTE"
+          role: "DOCENTE",
+          emailVerified: new Date(),
+          aprobado: true
         }
       })
 
